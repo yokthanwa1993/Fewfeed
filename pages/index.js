@@ -14,6 +14,7 @@ export default function Home() {
   const [isPublishing, setIsPublishing] = useState(false)
   const [currentStep, setCurrentStep] = useState('')
   const [progress, setProgress] = useState(0)
+  const [allMessages, setAllMessages] = useState('')
 
   // Load default values from API
   useEffect(() => {
@@ -48,41 +49,64 @@ export default function Home() {
     }))
   }
 
-  const updateProgress = (message) => {
-    if (message.includes('Server received publish request')) {
+  const updateProgress = (allMessages) => {
+    // Clean message for better matching
+    const cleanMessage = allMessages.replace(/\n/g, ' ').trim()
+    
+    // Debug log
+    console.log('Progress check:', cleanMessage.substring(cleanMessage.length - 100))
+    
+    if (cleanMessage.includes('🔄 Server received publish request')) {
       setCurrentStep('เริ่มต้นการประมวลผล')
-      setProgress(5)
-    } else if (message.includes('Form data extracted')) {
+      setProgress(8)
+    } else if (cleanMessage.includes('✅ Form data extracted successfully')) {
       setCurrentStep('ตรวจสอบข้อมูล')
-      setProgress(10)
-    } else if (message.includes('Image prepared successfully')) {
+      setProgress(12)
+    } else if (cleanMessage.includes('✅ Image prepared successfully')) {
       setCurrentStep('เตรียมรูปภาพเรียบร้อย')
-      setProgress(15)
-    } else if (message.includes('STEP 1')) {
+      setProgress(18)
+    } else if (cleanMessage.includes('✅ Facebook Publisher initialized successfully')) {
+      setCurrentStep('เตรียมระบบ Facebook')
+      setProgress(22)
+    } else if (cleanMessage.includes('🔄 STEP 1: Creating Ad Creative')) {
       setCurrentStep('สร้าง Ad Creative')
-      setProgress(25)
-    } else if (message.includes('Creative created successfully')) {
+      setProgress(28)
+    } else if (cleanMessage.includes('✅ Creative created successfully')) {
       setCurrentStep('สร้าง Creative สำเร็จ')
-      setProgress(35)
-    } else if (message.includes('STEP 2')) {
+      setProgress(38)
+    } else if (cleanMessage.includes('🔄 STEP 2: Triggering post processing')) {
       setCurrentStep('เริ่มกระบวนการประมวลผล')
-      setProgress(45)
-    } else if (message.includes('STEP 3')) {
+      setProgress(48)
+    } else if (cleanMessage.includes('✅ Processing triggered successfully')) {
+      setCurrentStep('ประมวลผลสำเร็จ')
+      setProgress(52)
+    } else if (cleanMessage.includes('🔄 STEP 3: Fetching Page Access Token')) {
       setCurrentStep('ดึง Page Access Token')
-      setProgress(55)
-    } else if (message.includes('STEP 4')) {
+      setProgress(58)
+    } else if (cleanMessage.includes('🔄 STEP 4: Waiting for Facebook to generate Post ID')) {
       setCurrentStep('รอ Facebook สร้าง Post ID')
-      setProgress(65)
-    } else if (message.includes('Post ID generated successfully')) {
+      setProgress(68)
+    } else if (cleanMessage.includes('🔍 Attempt') && cleanMessage.includes('Checking for Post ID')) {
+      const attemptMatch = cleanMessage.match(/🔍 Attempt (\d+)\/10/)
+      if (attemptMatch) {
+        const attempt = parseInt(attemptMatch[1])
+        const progressValue = 68 + (attempt * 1.2) // Increment by 1.2% per attempt
+        setCurrentStep(`กำลังตรวจสอบ Post ID (ครั้งที่ ${attempt}/10)`)
+        setProgress(Math.min(progressValue, 78))
+      }
+    } else if (cleanMessage.includes('✅ Post ID generated successfully')) {
       setCurrentStep('ได้รับ Post ID แล้ว')
-      setProgress(80)
-    } else if (message.includes('STEP 5')) {
+      setProgress(82)
+    } else if (cleanMessage.includes('🔄 STEP 5: Publishing the post')) {
       setCurrentStep('เผยแพร่โพสต์')
-      setProgress(90)
-    } else if (message.includes('SUCCESS!') || message.includes('🎉')) {
+      setProgress(92)
+    } else if (cleanMessage.includes('✅ Post published successfully')) {
       setCurrentStep('เผยแพร่สำเร็จ!')
+      setProgress(96)
+    } else if (cleanMessage.includes('🎉 SUCCESS! Post published successfully')) {
+      setCurrentStep('เสร็จสิ้น!')
       setProgress(100)
-    } else if (message.includes('FAILED!') || message.includes('💥')) {
+    } else if (cleanMessage.includes('💥 PUBLISHING FAILED')) {
       setCurrentStep('เกิดข้อผิดพลาด')
       setProgress(0)
     }
@@ -93,7 +117,8 @@ export default function Home() {
     setIsPublishing(true)
     setOutput('⏳ เริ่มต้นการเผยแพร่...\n')
     setCurrentStep('เตรียมข้อมูล')
-    setProgress(10)
+    setProgress(5)
+    setAllMessages('')
 
     const formDataToSend = new FormData()
     Object.keys(formData).forEach(key => {
@@ -118,7 +143,11 @@ export default function Home() {
         
         const chunk = decoder.decode(value, { stream: true })
         setOutput(prev => prev + chunk)
-        updateProgress(chunk)
+        setAllMessages(prev => {
+          const newMessages = prev + chunk
+          updateProgress(newMessages)
+          return newMessages
+        })
       }
 
     } catch (error) {
@@ -126,12 +155,13 @@ export default function Home() {
       setCurrentStep('เกิดข้อผิดพลาด')
     } finally {
       setIsPublishing(false)
-      if (progress === 100) {
-        setTimeout(() => {
+      setTimeout(() => {
+        if (progress === 100) {
           setCurrentStep('')
           setProgress(0)
-        }, 3000)
-      }
+          setAllMessages('')
+        }
+      }, 3000)
     }
   }
 
@@ -227,6 +257,9 @@ export default function Home() {
                 className={styles.progressFill} 
                 style={{ width: `${progress}%` }}
               ></div>
+            </div>
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+              📊 Progress tracking: {progress > 5 ? '✅ Active' : '⏳ Waiting...'}
             </div>
           </div>
         )}
