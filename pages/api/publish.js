@@ -9,7 +9,20 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true })
 }
 
-const upload = multer({ dest: uploadDir })
+const upload = multer({ 
+  dest: uploadDir,
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true)
+    } else {
+      cb(new Error('Only image files are allowed'), false)
+    }
+  },
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+})
 
 // Disable body parsing for this API route
 export const config = {
@@ -69,10 +82,21 @@ export default async function handler(req, res) {
     
     res.write('📤 Preparing image for upload...\n')
     
+    // Get file extension from original filename
+    const fileExtension = path.extname(req.file.originalname) || '.jpg'
+    const newFilename = req.file.filename + fileExtension
+    const oldPath = req.file.path
+    const newPath = path.join(uploadDir, newFilename)
+    
+    // Rename file to include extension
+    fs.renameSync(oldPath, newPath)
+    req.file.path = newPath
+    req.file.filename = newFilename
+    
     // Create public URL for the uploaded file
     const protocol = req.headers['x-forwarded-proto'] || 'http'
     const host = req.headers.host
-    const imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`
+    const imageUrl = `${protocol}://${host}/uploads/${newFilename}`
     res.write(`✅ Image ready: ${imageUrl}\n\n`)
     
     if (!accessToken || !cookieData || !linkUrl || !linkName) {
