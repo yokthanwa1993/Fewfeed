@@ -12,6 +12,8 @@ export default function Home() {
   })
   const [output, setOutput] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
+  const [currentStep, setCurrentStep] = useState('')
+  const [progress, setProgress] = useState(0)
 
   // Load default values from API
   useEffect(() => {
@@ -46,10 +48,52 @@ export default function Home() {
     }))
   }
 
+  const updateProgress = (message) => {
+    if (message.includes('Server received publish request')) {
+      setCurrentStep('เริ่มต้นการประมวลผล')
+      setProgress(5)
+    } else if (message.includes('Form data extracted')) {
+      setCurrentStep('ตรวจสอบข้อมูล')
+      setProgress(10)
+    } else if (message.includes('Image prepared successfully')) {
+      setCurrentStep('เตรียมรูปภาพเรียบร้อย')
+      setProgress(15)
+    } else if (message.includes('STEP 1')) {
+      setCurrentStep('สร้าง Ad Creative')
+      setProgress(25)
+    } else if (message.includes('Creative created successfully')) {
+      setCurrentStep('สร้าง Creative สำเร็จ')
+      setProgress(35)
+    } else if (message.includes('STEP 2')) {
+      setCurrentStep('เริ่มกระบวนการประมวลผล')
+      setProgress(45)
+    } else if (message.includes('STEP 3')) {
+      setCurrentStep('ดึง Page Access Token')
+      setProgress(55)
+    } else if (message.includes('STEP 4')) {
+      setCurrentStep('รอ Facebook สร้าง Post ID')
+      setProgress(65)
+    } else if (message.includes('Post ID generated successfully')) {
+      setCurrentStep('ได้รับ Post ID แล้ว')
+      setProgress(80)
+    } else if (message.includes('STEP 5')) {
+      setCurrentStep('เผยแพร่โพสต์')
+      setProgress(90)
+    } else if (message.includes('SUCCESS!') || message.includes('🎉')) {
+      setCurrentStep('เผยแพร่สำเร็จ!')
+      setProgress(100)
+    } else if (message.includes('FAILED!') || message.includes('💥')) {
+      setCurrentStep('เกิดข้อผิดพลาด')
+      setProgress(0)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsPublishing(true)
-    setOutput('⏳ Publishing, please wait...\n')
+    setOutput('⏳ เริ่มต้นการเผยแพร่...\n')
+    setCurrentStep('เตรียมข้อมูล')
+    setProgress(10)
 
     const formDataToSend = new FormData()
     Object.keys(formData).forEach(key => {
@@ -74,12 +118,20 @@ export default function Home() {
         
         const chunk = decoder.decode(value, { stream: true })
         setOutput(prev => prev + chunk)
+        updateProgress(chunk)
       }
 
     } catch (error) {
       setOutput(prev => prev + `\n❌ Error: ${error.message}`)
+      setCurrentStep('เกิดข้อผิดพลาด')
     } finally {
       setIsPublishing(false)
+      if (progress === 100) {
+        setTimeout(() => {
+          setCurrentStep('')
+          setProgress(0)
+        }, 3000)
+      }
     }
   }
 
@@ -161,8 +213,23 @@ export default function Home() {
         </div>
 
         <button type="submit" disabled={isPublishing}>
-          {isPublishing ? 'Publishing...' : 'Publish to Facebook'}
+          {isPublishing ? 'กำลังเผยแพร่...' : 'เผยแพร่ไปยัง Facebook'}
         </button>
+
+        {isPublishing && (
+          <div className={styles.progressContainer}>
+            <div className={styles.progressInfo}>
+              <span className={styles.currentStep}>{currentStep}</span>
+              <span className={styles.progressPercent}>{progress}%</span>
+            </div>
+            <div className={styles.progressBar}>
+              <div 
+                className={styles.progressFill} 
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
       </form>
 
       {output && (

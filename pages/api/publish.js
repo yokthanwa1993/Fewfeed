@@ -59,6 +59,7 @@ export default async function handler(req, res) {
     
     // Send immediate response
     res.write('🔄 Server received publish request...\n')
+    res.write('📋 Extracting form data...\n')
     
     const { 
       accessToken, 
@@ -72,7 +73,9 @@ export default async function handler(req, res) {
       description
     } = req.body
     
-    res.write('✅ Form data extracted\n')
+    res.write('✅ Form data extracted successfully\n')
+    res.write(`  🔗 Link URL: ${linkUrl}\n`)
+    res.write(`  📝 Link Name: ${linkName}\n`)
     
     if (!req.file) {
       res.write('❌ No image file was uploaded\n')
@@ -81,6 +84,8 @@ export default async function handler(req, res) {
     }
     
     res.write('📤 Preparing image for upload...\n')
+    res.write(`  📁 Original filename: ${req.file.originalname}\n`)
+    res.write(`  📏 File size: ${(req.file.size / 1024 / 1024).toFixed(2)} MB\n`)
     
     // Get file extension from original filename
     const fileExtension = path.extname(req.file.originalname) || '.jpg'
@@ -97,7 +102,8 @@ export default async function handler(req, res) {
     const protocol = req.headers['x-forwarded-proto'] || 'http'
     const host = req.headers.host
     const imageUrl = `${protocol}://${host}/uploads/${newFilename}`
-    res.write(`✅ Image ready: ${imageUrl}\n\n`)
+    res.write(`✅ Image prepared successfully!\n`)
+    res.write(`  🌐 Public URL: ${imageUrl}\n\n`)
     
     if (!accessToken || !cookieData || !linkUrl || !linkName) {
       res.write('❌ Missing required fields\n')
@@ -107,6 +113,8 @@ export default async function handler(req, res) {
     }
 
     res.write('🔄 Initializing Facebook Publisher...\n')
+    res.write(`  🏢 Ad Account ID: ${adAccountId || 'act_1148837732288721'}\n`)
+    res.write(`  📄 Page ID: ${pageId || '146000051932080'}\n`)
     
     const publisher = new FacebookPublisher({
       accessToken,
@@ -116,8 +124,11 @@ export default async function handler(req, res) {
       pageId: pageId || '146000051932080'
     })
 
-    res.write('✅ Facebook Publisher initialized\n')
-    res.write('🚀 Starting publishing process...\n')
+    res.write('✅ Facebook Publisher initialized successfully\n')
+    res.write('🚀 Starting Facebook publishing process...\n\n')
+
+    // Track start time
+    const startTime = Date.now()
 
     // Redirect console.log to response stream
     const originalLog = console.log
@@ -145,9 +156,14 @@ export default async function handler(req, res) {
         description || 'กดเพื่อดูเพิ่มเติม'
       )
 
-      res.write(`\n🎉 Success! Post published: ${result.url}\n`)
+      const duration = Math.round((Date.now() - startTime) / 1000)
+      res.write(`\n🎉 SUCCESS! Post published successfully!\n`)
+      res.write(`🔗 View your post: ${result.url}\n`)
+      res.write(`⏱️ Total time: ${duration} seconds\n`)
     } catch (error) {
-      res.write(`\n💥 Publishing failed: ${error.message}\n`)
+      res.write(`\n💥 PUBLISHING FAILED!\n`)
+      res.write(`❌ Error: ${error.message}\n`)
+      res.write(`💡 Please check your tokens and try again\n`)
     } finally {
       // Restore console functions
       console.log = originalLog
