@@ -65,69 +65,74 @@ app.get('/', (req, res) => {
 });
 
 app.post('/publish', upload.single('imageFile'), async (req, res) => {
-    // Extract all form fields
-    const { 
-        accessToken, 
-        accessToken2, 
-        cookieData, 
-        linkUrl, 
-        linkName,
-        adAccountId,
-        pageId,
-        caption,
-        description
-    } = req.body;
-    
-    if (!req.file) {
-        return res.status(400).send('Error: No image file was uploaded.');
-    }
-    
-    // Set headers for streaming response
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    
-    // Send immediate response to browser
-    res.write('🔄 Server received publish request...\n');
-    res.write('📤 Preparing image for upload...\n');
-    
-    // Create public URL for the uploaded file
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-    res.write(`✅ Image ready: ${imageUrl}\n\n`);
-    
-    // Force flush the response to browser immediately
-    res.flushHeaders();
-    
-    console.log('=== DEBUG: Image Upload ===');
-    console.log('Uploaded file:', req.file.filename);
-    console.log('Local file path:', req.file.path);
-    console.log('Public Image URL:', imageUrl);
-    console.log('==========================');
-
-    // Debug: Log received values
-    console.log('=== DEBUG: Received form data ===');
-    console.log('ACCESS_TOKEN:', accessToken ? accessToken.substring(0, 20) + '...' : 'undefined');
-    console.log('ACCESS_TOKEN2:', accessToken2 ? accessToken2.substring(0, 20) + '...' : 'undefined');
-    console.log('COOKIE_DATA:', cookieData ? cookieData.substring(0, 50) + '...' : 'undefined');
-    console.log('AD_ACCOUNT_ID:', adAccountId);
-    console.log('PAGE_ID:', pageId);
-    console.log('CAPTION:', caption);
-    console.log('DESCRIPTION:', description);
-    console.log('LINK_URL:', linkUrl);
-    console.log('LINK_NAME:', linkName);
-    console.log('================================');
-
-    // We no longer need to check for message here
-    if (!accessToken || !cookieData || !linkUrl || !linkName) {
-        fs.unlinkSync(req.file.path);
-        return res.status(400).send('Error: Access Token, Cookie Data, Link URL and Link Name are required.');
-    }
-
-    // Use JavaScript Facebook Publisher instead of shell script
-    res.write('🔄 Initializing Facebook Publisher...\n');
-    if (res.flush) res.flush();
-    
+    // Wrap everything in try-catch to catch any early errors
     try {
+        // Set headers for streaming response FIRST
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // Send immediate response to browser
+        res.write('🔄 Server received publish request...\n');
+        res.flushHeaders(); // Force send immediately
+        
+        // Extract all form fields
+        const { 
+            accessToken, 
+            accessToken2, 
+            cookieData, 
+            linkUrl, 
+            linkName,
+            adAccountId,
+            pageId,
+            caption,
+            description
+        } = req.body;
+        
+        res.write('✅ Form data extracted\n');
+        
+        if (!req.file) {
+            res.write('❌ No image file was uploaded\n');
+            res.end();
+            return;
+        }
+        
+        res.write('📤 Preparing image for upload...\n');
+        
+        // Create public URL for the uploaded file
+        const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+        res.write(`✅ Image ready: ${imageUrl}\n\n`);
+        
+        console.log('=== DEBUG: Image Upload ===');
+        console.log('Uploaded file:', req.file.filename);
+        console.log('Local file path:', req.file.path);
+        console.log('Public Image URL:', imageUrl);
+        console.log('==========================');
+
+        // Debug: Log received values
+        console.log('=== DEBUG: Received form data ===');
+        console.log('ACCESS_TOKEN:', accessToken ? accessToken.substring(0, 20) + '...' : 'undefined');
+        console.log('ACCESS_TOKEN2:', accessToken2 ? accessToken2.substring(0, 20) + '...' : 'undefined');
+        console.log('COOKIE_DATA:', cookieData ? cookieData.substring(0, 50) + '...' : 'undefined');
+        console.log('AD_ACCOUNT_ID:', adAccountId);
+        console.log('PAGE_ID:', pageId);
+        console.log('CAPTION:', caption);
+        console.log('DESCRIPTION:', description);
+        console.log('LINK_URL:', linkUrl);
+        console.log('LINK_NAME:', linkName);
+        console.log('================================');
+
+        // We no longer need to check for message here
+        if (!accessToken || !cookieData || !linkUrl || !linkName) {
+            res.write('❌ Missing required fields\n');
+            if (req.file) fs.unlinkSync(req.file.path);
+            res.end();
+            return;
+        }
+
+        // Use JavaScript Facebook Publisher instead of shell script
+        res.write('🔄 Initializing Facebook Publisher...\n');
+        if (res.flush) res.flush();
         const publisher = new FacebookPublisher({
             accessToken,
             accessToken2,
