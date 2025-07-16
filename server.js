@@ -1,9 +1,9 @@
 const express = require('express');
-const { spawn } = require('child_process');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const FormData = require('form-data');
+const FacebookPublisher = require('./facebook-publisher');
 
 const app = express();
 const port = 3000;
@@ -135,50 +135,56 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
         return res.status(400).send('Error: Access Token, Cookie Data, Link URL and Link Name are required.');
     }
 
-    const scriptPath = './publish_to_facebook.sh';
-    
-    // Add timeout to prevent hanging
-    const child = spawn('bash', [scriptPath], {
-        env: {
-            ...process.env,
-            ACCESS_TOKEN: accessToken,
-            ACCESS_TOKEN2: accessToken2,
-            COOKIE_DATA: cookieData,
-            IMAGE_URL: imageUrl,
-            LINK_URL: linkUrl,
-            LINK_NAME: linkName,
-            AD_ACCOUNT_ID: adAccountId,
-            PAGE_ID: pageId,
-            CAPTION: caption,
-            DESCRIPTION: description
-        },
-        timeout: 120000 // 2 minutes timeout
-    });
-    
-    child.stdout.on('data', (data) => {
-        res.write(data.toString());
-    });
+    // Use JavaScript Facebook Publisher instead of shell script
+    try {
+        const publisher = new FacebookPublisher({
+            accessToken,
+            accessToken2,
+            cookieData,
+            adAccountId: adAccountId || 'act_1148837732288721',
+            pageId: pageId || '146000051932080'
+        });
 
-    child.stderr.on('data', (data) => {
-        res.write(`Error: ${data.toString()}`);
-    });
-
-    // Add timeout handler
-    const timeoutId = setTimeout(() => {
-        res.write('\n❌ Process timed out after 2 minutes. This might be due to:\n');
-        res.write('- Invalid Facebook access tokens\n');
-        res.write('- Expired cookies\n');
-        res.write('- Network connectivity issues\n');
-        res.write('- Facebook API rate limiting\n\n');
-        res.write('Please check your credentials and try again.\n');
-        child.kill('SIGTERM');
-        res.end();
-    }, 120000);
-
-    child.on('close', (code) => {
-        clearTimeout(timeoutId);
+        // Redirect console.log to response stream for real-time updates
+        const originalLog = console.log;
+        const originalError = console.error;
         
-        // Clean up local file immediately since image is now hosted on freeimage.host
+        console.log = (...args) => {
+            const message = args.join(' ') + '\n';
+            res.write(message);
+            originalLog(...args);
+        };
+        
+        console.error = (...args) => {
+            const message = '❌ ' + args.join(' ') + '\n';
+            res.write(message);
+            originalError(...args);
+        };
+
+        // Publish to Facebook
+        const result = await publisher.publishToFacebook(
+            imageUrl,
+            linkUrl,
+            linkName,
+            caption || 'LAZADA.CO.TH',
+            description || 'กดเพื่อดูเพิ่มเติม'
+        );
+
+        // Restore original console functions
+        console.log = originalLog;
+        console.error = originalError;
+
+        res.write(`\n🎉 Success! Post published: ${result.url}\n`);
+        
+    } catch (error) {
+        // Restore original console functions
+        console.log = originalLog;
+        console.error = originalError;
+        
+        res.write(`\n💥 Publishing failed: ${error.message}\n`);
+        console.error('Publishing error:', error);
+    } finally {
+        // Clean up local file
         if (req.file) {
             try {
                 fs.unlinkSync(req.file.path);
@@ -187,21 +193,8 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
                 console.log(`⚠️  File already deleted: ${req.file.filename}`);
             }
         }
-        
-        if (code !== 0) {
-            res.write(`\n❌ Script exited with code ${code}\n`);
-            if (code === null) {
-                res.write('Process was terminated (likely due to timeout)\n');
-            }
-        }
         res.end();
-    });
-
-    child.on('error', (error) => {
-        clearTimeout(timeoutId);
-        res.write(`\n❌ Process error: ${error.message}\n`);
-        res.end();
-    });
+    }
 });
 
 app.listen(port, () => {
