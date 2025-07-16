@@ -8,33 +8,19 @@ const FacebookPublisher = require('./facebook-publisher');
 const app = express();
 const port = 3000;
 
-// Function to upload image to freeimage.host
-async function uploadToFreeImageHost(filePath) {
-    const fetch = (await import('node-fetch')).default;
-    
+// Function to clean up uploaded files after successful Facebook post
+function cleanupUploadedFile(filePath) {
     try {
-        const form = new FormData();
-        form.append('key', '6d207e02198a847aa98d0a2a901485a5'); // Free API key
-        form.append('action', 'upload');
-        form.append('source', fs.createReadStream(filePath));
-        form.append('format', 'json');
-
-        const response = await fetch('https://freeimage.host/api/1/upload', {
-            method: 'POST',
-            body: form
-        });
-
-        const result = await response.json();
-        
-        if (result.status_code === 200) {
-            return result.image.url;
-        } else {
-            throw new Error(`Upload failed: ${result.error?.message || 'Unknown error'}`);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`✅ Cleaned up uploaded file: ${path.basename(filePath)}`);
+            return true;
         }
-    } catch (error) {
-        console.error('❌ Failed to upload to freeimage.host:', error);
-        throw error;
+    } catch (err) {
+        console.log(`⚠️ Failed to cleanup file: ${err.message}`);
+        return false;
     }
+    return false;
 }
 
 // Setup for file uploads
@@ -97,24 +83,17 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
     }
     
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.write('📤 Uploading image to freeimage.host...\n');
+    res.write('📤 Preparing image for upload...\n');
     
-    let imageUrl;
-    try {
-        // Upload image to freeimage.host
-        imageUrl = await uploadToFreeImageHost(req.file.path);
-        res.write(`✅ Image uploaded successfully: ${imageUrl}\n\n`);
-        
-        console.log('=== DEBUG: Image Upload ===');
-        console.log('Uploaded file:', req.file.filename);
-        console.log('Public Image URL:', imageUrl);
-        console.log('==========================');
-    } catch (error) {
-        res.write(`❌ Failed to upload image: ${error.message}\n`);
-        fs.unlinkSync(req.file.path); // Clean up local file
-        res.end();
-        return;
-    }
+    // Create public URL for the uploaded file
+    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    res.write(`✅ Image ready: ${imageUrl}\n\n`);
+    
+    console.log('=== DEBUG: Image Upload ===');
+    console.log('Uploaded file:', req.file.filename);
+    console.log('Local file path:', req.file.path);
+    console.log('Public Image URL:', imageUrl);
+    console.log('==========================');
 
     // Debug: Log received values
     console.log('=== DEBUG: Received form data ===');
