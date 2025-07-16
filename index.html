@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook Auto-Publisher</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 2rem; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { background: #fff; padding: 2.5rem; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); width: 100%; max-width: 600px; }
+        h1 { text-align: center; color: #1877f2; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; font-weight: 600; color: #606770; margin-bottom: 0.5rem; }
+        input, textarea { width: 100%; padding: 0.75rem; border: 1px solid #dddfe2; border-radius: 6px; font-size: 1rem; box-sizing: border-box; }
+        textarea { resize: vertical; min-height: 100px; }
+        button { width: 100%; padding: 0.8rem; background-color: #1877f2; color: white; border: none; border-radius: 6px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #166fe5; }
+        #output { margin-top: 2rem; background-color: #e7f3ff; border: 1px solid #cfe2f3; border-radius: 6px; padding: 1rem; white-space: pre-wrap; word-wrap: break-word; font-family: "SF Mono", "Menlo", "Monaco", monospace; font-size: 0.9rem; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Facebook Auto-Publisher</h1>
+        <form id="publishForm">
+            <div class="form-group">
+                <label for="accessToken">Access Token</label>
+                <textarea id="accessToken" name="accessToken" required>EAABsbCS1iHgBPAY3iLH6iixFcCQ74w0HJZAPnnZB3x4ON39WV6MQbAcf42cvbZB82EdD1vfufq5l4mGsDxAzGJoiatXQZCI2QuBKgMxdRtaUlbXKgSgMKOoGSkkmBSAhzeoxezp1QZAmBl4vItcbZBzzu2EOdJDJRolnjOwJ2pakj8HvIcSNllRVDVcLSlPxZAAcwxiX4jiFP64ZBQZDZD</textarea>
+            </div>
+            <div class="form-group">
+                <label for="accessToken2">Access Token 2</label>
+                <textarea id="accessToken2" name="accessToken2" required>EAAChZCKmUTDcBPPXbtYYXGtY0ZBh8khmzbZCAEVOqRZCQZAdQgYFNJOaMqt0NLpm1myrxytZChZBSrPBeHrpbJhD8oSMUzwDb5ZB7NJ2X3R3tLZAI0jOwZBlFYU8b8U7cttG6oyWS5cZBlvGN8XChQcgnZBZAqhXhbFvZAgvTedPRrZARfinO2Ic2s9TL2tZABG2tPlNUxPxEhvkcLTx5ZCjILogIiPMQZBIUZD</textarea>
+            </div>
+            <div class="form-group">
+                <label for="cookieData">Cookie Data</label>
+                <textarea id="cookieData" name="cookieData" required>dbln=%7B%22100056864839947%22%3A%22fQL0ngDj%22%7D; datr=FY5vaJkvRxhuJNlz9lRPAsOW; sb=FY5vaD1eu37Fg5HEh6yKmyQV; wd=2560x1210; locale=th_TH; c_user=100056864839947; xs=15%3APWCSP7Z44IGmvg%3A2%3A1752141442%3A-1%3A-1; fr=06GRkBXJsb8iRi1ye.AWe86VQQFfT_m4RO_Helcqvd-gsXl4OIqZby3wTRnoOA2BgfxcM.Bob44V..AAA.0.0.Bob5MS.AWfB267gsIDD_HBckJjKDHSNPdk;</textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="imageFile">Upload Image</label>
+                <input type="file" id="imageFile" name="imageFile" accept="image/png, image/jpeg, image/gif" required>
+            </div>
+             <div class="form-group">
+                <label for="linkUrl">Link URL</label>
+                <input type="url" id="linkUrl" name="linkUrl" value="https://s.lazada.co.th/s.yQ0ji?cc" required>
+            </div>
+             <div class="form-group">
+                <label for="linkName">Link Name (Headline)</label>
+                <input type="text" id="linkName" name="linkName" value="พิกัด : เสื้อยืดแขนสั้นผู้หญิงสีขาว" required>
+            </div>
+            <button type="submit">Publish to Facebook</button>
+        </form>
+        <div id="output" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Load default values from publish_to_facebook.sh when page loads
+        async function loadDefaults() {
+            try {
+                const response = await fetch('/api/defaults');
+                const defaults = await response.json();
+                
+                // Update form fields with values from script (only visible fields)
+                document.getElementById('accessToken').value = defaults.accessToken;
+                document.getElementById('accessToken2').value = defaults.accessToken2;
+                document.getElementById('cookieData').value = defaults.cookieData;
+                document.getElementById('linkUrl').value = defaults.linkUrl;
+                document.getElementById('linkName').value = defaults.linkName;
+                
+                console.log('✅ Default values loaded from publish_to_facebook.sh');
+            } catch (error) {
+                console.error('❌ Failed to load default values:', error);
+            }
+        }
+
+        // Load defaults when page loads
+        document.addEventListener('DOMContentLoaded', loadDefaults);
+
+        document.getElementById('publishForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const outputDiv = document.getElementById('output');
+            outputDiv.style.display = 'block';
+            outputDiv.innerHTML = '⏳ Publishing, please wait...<br>';
+
+            const formData = new FormData(event.target);
+            
+            try {
+                const response = await fetch('/publish', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                outputDiv.innerHTML = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        break;
+                    }
+                    const chunk = decoder.decode(value, { stream: true });
+                    const sanitizedChunk = chunk.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    outputDiv.innerHTML += sanitizedChunk;
+                    outputDiv.scrollTop = outputDiv.scrollHeight;
+                }
+
+            } catch (error) {
+                outputDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html> 
