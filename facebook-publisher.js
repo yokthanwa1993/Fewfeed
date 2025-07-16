@@ -218,4 +218,4 @@ class FacebookPublisher {
     }
 }
 
-module.exports = FacebookPublisher;
+export default FacebookPublisher;

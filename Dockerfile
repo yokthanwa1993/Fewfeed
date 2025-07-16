@@ -7,17 +7,20 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --omit=dev
+# Install all dependencies
+RUN npm install
 
 # Copy application files
 COPY . .
 
+# Build React app with Vite
+RUN npm run build
+
 # Create uploads directory
 RUN mkdir -p uploads
 
-# Expose port
-EXPOSE 3000
+# Expose port (Vite uses 5173 by default)
+EXPOSE 5173
 
-# Start the application
-CMD ["npm", "start"]
+# Start Vite in preview mode (serves built files)
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]
