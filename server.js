@@ -136,6 +136,8 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
     }
 
     const scriptPath = './publish_to_facebook.sh';
+    
+    // Add timeout to prevent hanging
     const child = spawn('bash', [scriptPath], {
         env: {
             ...process.env,
@@ -149,7 +151,8 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
             PAGE_ID: pageId,
             CAPTION: caption,
             DESCRIPTION: description
-        }
+        },
+        timeout: 120000 // 2 minutes timeout
     });
     
     child.stdout.on('data', (data) => {
@@ -160,7 +163,21 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
         res.write(`Error: ${data.toString()}`);
     });
 
+    // Add timeout handler
+    const timeoutId = setTimeout(() => {
+        res.write('\n❌ Process timed out after 2 minutes. This might be due to:\n');
+        res.write('- Invalid Facebook access tokens\n');
+        res.write('- Expired cookies\n');
+        res.write('- Network connectivity issues\n');
+        res.write('- Facebook API rate limiting\n\n');
+        res.write('Please check your credentials and try again.\n');
+        child.kill('SIGTERM');
+        res.end();
+    }, 120000);
+
     child.on('close', (code) => {
+        clearTimeout(timeoutId);
+        
         // Clean up local file immediately since image is now hosted on freeimage.host
         if (req.file) {
             try {
@@ -170,9 +187,19 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
                 console.log(`⚠️  File already deleted: ${req.file.filename}`);
             }
         }
+        
         if (code !== 0) {
-            res.write(`\nScript exited with code ${code}`);
+            res.write(`\n❌ Script exited with code ${code}\n`);
+            if (code === null) {
+                res.write('Process was terminated (likely due to timeout)\n');
+            }
         }
+        res.end();
+    });
+
+    child.on('error', (error) => {
+        clearTimeout(timeoutId);
+        res.write(`\n❌ Process error: ${error.message}\n`);
         res.end();
     });
 });

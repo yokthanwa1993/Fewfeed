@@ -32,6 +32,10 @@ LINK_NAME="${LINK_NAME:-พิกัด : เสื้อยืดแขนส�
 
 # --- Step 1: Create the Ad Creative ---
 echo " STEP 1: Creating Ad Creative..."
+echo "  Debug: Using IMAGE_URL: $PICTURE_URL"
+echo "  Debug: Using ACCESS_TOKEN: ${ACCESS_TOKEN:0:20}..."
+echo "  Debug: Using AD_ACCOUNT_ID: $AD_ACCOUNT_ID"
+
 JSON_PAYLOAD=$(jq -n \
   --arg picture "$PICTURE_URL" \
   --arg description "$DESCRIPTION" \
@@ -41,12 +45,19 @@ JSON_PAYLOAD=$(jq -n \
   --arg page_id "$PAGE_ID" \
   '{object_story_spec: {link_data: {picture: $picture, description: $description, link: $link, name: $name, multi_share_optimized: true, multi_share_end_card: false, caption: $caption, call_to_action: {type: "LEARN_MORE"}}, page_id: $page_id}}')
 
+echo "  Debug: JSON Payload created"
+
 CREATE_URL="https://graph.facebook.com/v21.0/${AD_ACCOUNT_ID}/adcreatives?access_token=${ACCESS_TOKEN}&fields=effective_object_story_id"
+echo "  Debug: Making API call to Facebook..."
+
 CREATE_RESPONSE=$(curl -s -X POST "$CREATE_URL" \
   -H "cookie: $COOKIE_DATA" \
   -H 'content-type: application/json' \
   -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36' \
-  --data-raw "$JSON_PAYLOAD")
+  --data-raw "$JSON_PAYLOAD" \
+  --max-time 30)
+
+echo "  Debug: API call completed"
 
 CREATIVE_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id')
 
