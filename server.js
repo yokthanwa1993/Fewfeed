@@ -82,12 +82,21 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
         return res.status(400).send('Error: No image file was uploaded.');
     }
     
+    // Set headers for streaming response
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    // Send immediate response to browser
+    res.write('🔄 Server received publish request...\n');
     res.write('📤 Preparing image for upload...\n');
     
     // Create public URL for the uploaded file
     const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
     res.write(`✅ Image ready: ${imageUrl}\n\n`);
+    
+    // Force flush the response to browser immediately
+    res.flushHeaders();
     
     console.log('=== DEBUG: Image Upload ===');
     console.log('Uploaded file:', req.file.filename);
@@ -115,6 +124,9 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
     }
 
     // Use JavaScript Facebook Publisher instead of shell script
+    res.write('🔄 Initializing Facebook Publisher...\n');
+    if (res.flush) res.flush();
+    
     try {
         const publisher = new FacebookPublisher({
             accessToken,
@@ -123,6 +135,10 @@ app.post('/publish', upload.single('imageFile'), async (req, res) => {
             adAccountId: adAccountId || 'act_1148837732288721',
             pageId: pageId || '146000051932080'
         });
+
+        res.write('✅ Facebook Publisher initialized\n');
+        res.write('🚀 Starting publishing process...\n');
+        if (res.flush) res.flush();
 
         // Redirect console.log to response stream for real-time updates
         const originalLog = console.log;
