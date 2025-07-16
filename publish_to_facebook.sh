@@ -50,19 +50,59 @@ echo "  Debug: JSON Payload created"
 CREATE_URL="https://graph.facebook.com/v21.0/${AD_ACCOUNT_ID}/adcreatives?access_token=${ACCESS_TOKEN}&fields=effective_object_story_id"
 echo "  Debug: Making API call to Facebook..."
 
-CREATE_RESPONSE=$(curl -s -X POST "$CREATE_URL" \
+# Function to check curl exit status and response
+check_curl_response() {
+    local curl_exit_code=$1
+    local response="$2"
+    local step_name="$3"
+    
+    if [ $curl_exit_code -ne 0 ]; then
+        echo "  ❌ ERROR: curl failed with exit code $curl_exit_code in $step_name"
+        case $curl_exit_code in
+            6) echo "     Couldn't resolve host" ;;
+            7) echo "     Failed to connect to host" ;;
+            28) echo "     Operation timeout" ;;
+            *) echo "     Unknown curl error" ;;
+        esac
+        exit 1
+    fi
+    
+    # Check if response contains error
+    local error_message=$(echo "$response" | jq -r '.error.message // empty' 2>/dev/null)
+    if [ -n "$error_message" ]; then
+        echo "  ❌ ERROR: Facebook API error in $step_name: $error_message"
+        echo "  Full response: $response"
+        exit 1
+    fi
+}
+
+CREATE_RESPONSE=$(curl -w "%{http_code}" -s -X POST "$CREATE_URL" \
   -H "cookie: $COOKIE_DATA" \
   -H 'content-type: application/json' \
   -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36' \
   --data-raw "$JSON_PAYLOAD" \
-  --max-time 30)
+  --max-time 30 \
+  --connect-timeout 10)
 
-echo "  Debug: API call completed"
+CURL_EXIT_CODE=$?
+HTTP_CODE="${CREATE_RESPONSE: -3}"  # Last 3 characters (HTTP status)
+CREATE_RESPONSE="${CREATE_RESPONSE%???}"  # Remove last 3 characters
+
+echo "  Debug: API call completed with HTTP $HTTP_CODE"
+
+# Check curl and HTTP response
+check_curl_response $CURL_EXIT_CODE "$CREATE_RESPONSE" "Create Ad Creative"
+
+if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+    echo "  ❌ ERROR: HTTP $HTTP_CODE in Create Ad Creative"
+    echo "  Response: $CREATE_RESPONSE"
+    exit 1
+fi
 
 CREATIVE_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id')
 
 if [ -z "$CREATIVE_ID" ] || [ "$CREATIVE_ID" == "null" ]; then
-  echo "  ERROR: Failed to create Ad Creative. The script will stop. Response was:"
+  echo "  ❌ ERROR: Failed to create Ad Creative. Response was:"
   echo "  $CREATE_RESPONSE"
   exit 1
 fi
@@ -71,25 +111,53 @@ echo ""
 
 # --- Step 2: Initial GET to trigger processing ---
 echo " STEP 2: Triggering post processing..."
-curl -s -G "https://graph.facebook.com/v21.0/${CREATIVE_ID}" \
+TRIGGER_RESPONSE=$(curl -w "%{http_code}" -s -G "https://graph.facebook.com/v21.0/${CREATIVE_ID}" \
   -H "Cookie: $COOKIE_DATA" \
   --data-urlencode "access_token=$ACCESS_TOKEN" \
-  --data-urlencode "fields=effective_object_story_id" > /dev/null # We don't need the output of this one
+  --data-urlencode "fields=effective_object_story_id" \
+  --max-time 15 \
+  --connect-timeout 5)
 
-echo "  Trigger sent. Now polling for final ID..."
+CURL_EXIT_CODE=$?
+HTTP_CODE="${TRIGGER_RESPONSE: -3}"
+TRIGGER_RESPONSE="${TRIGGER_RESPONSE%???}"
+
+check_curl_response $CURL_EXIT_CODE "$TRIGGER_RESPONSE" "Trigger Processing"
+
+if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+    echo "  ✅ Trigger sent successfully (HTTP $HTTP_CODE)"
+else
+    echo "  ⚠️  Trigger got HTTP $HTTP_CODE, but continuing..."
+fi
+
+echo "  Now polling for final ID..."
 echo ""
 
 # --- Step 3: Fetch the Page Access Token ---
 echo " STEP 3: Fetching Page Access Token for Page ID ${PAGE_ID}..."
-PAGE_TOKEN_RESPONSE=$(curl -s -G "https://graph.facebook.com/v21.0/${PAGE_ID}" \
+PAGE_TOKEN_RESPONSE=$(curl -w "%{http_code}" -s -G "https://graph.facebook.com/v21.0/${PAGE_ID}" \
   -H "Cookie: $COOKIE_DATA" \
   --data-urlencode "access_token=$ACCESS_TOKEN" \
-  --data-urlencode "fields=access_token")
+  --data-urlencode "fields=access_token" \
+  --max-time 15 \
+  --connect-timeout 5)
+
+CURL_EXIT_CODE=$?
+HTTP_CODE="${PAGE_TOKEN_RESPONSE: -3}"
+PAGE_TOKEN_RESPONSE="${PAGE_TOKEN_RESPONSE%???}"
+
+check_curl_response $CURL_EXIT_CODE "$PAGE_TOKEN_RESPONSE" "Fetch Page Token"
+
+if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+    echo "  ❌ ERROR: HTTP $HTTP_CODE when fetching Page Access Token"
+    echo "  Response: $PAGE_TOKEN_RESPONSE"
+    exit 1
+fi
 
 PAGE_ACCESS_TOKEN=$(echo "$PAGE_TOKEN_RESPONSE" | jq -r '.access_token')
 
 if [ -z "$PAGE_ACCESS_TOKEN" ] || [ "$PAGE_ACCESS_TOKEN" == "null" ]; then
-    echo "  ERROR: Failed to fetch Page Access Token. Response was:"
+    echo "  ❌ ERROR: Failed to fetch Page Access Token. Response was:"
     echo "  $PAGE_TOKEN_RESPONSE"
     exit 1
 fi
@@ -103,15 +171,35 @@ MAX_ATTEMPTS=10
 ATTEMPT=0
 EFFECTIVE_ID=""
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-    POLL_RESPONSE=$(curl -s -G "https://graph.facebook.com/v21.0/${CREATIVE_ID}" \
+    POLL_RESPONSE=$(curl -w "%{http_code}" -s -G "https://graph.facebook.com/v21.0/${CREATIVE_ID}" \
       -H "Cookie: $COOKIE_DATA" \
       --data-urlencode "access_token=$ACCESS_TOKEN" \
-      --data-urlencode "fields=effective_object_story_id")
+      --data-urlencode "fields=effective_object_story_id" \
+      --max-time 10 \
+      --connect-timeout 5)
+    
+    CURL_EXIT_CODE=$?
+    HTTP_CODE="${POLL_RESPONSE: -3}"
+    POLL_RESPONSE="${POLL_RESPONSE%???}"
+    
+    if [ $CURL_EXIT_CODE -ne 0 ]; then
+        echo "  ⚠️  Attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS: Network error (curl code $CURL_EXIT_CODE), retrying..."
+        ATTEMPT=$((ATTEMPT + 1))
+        sleep 3
+        continue
+    fi
+    
+    if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+        echo "  ⚠️  Attempt $((ATTEMPT + 1))/$MAX_ATTEMPTS: HTTP $HTTP_CODE, retrying..."
+        ATTEMPT=$((ATTEMPT + 1))
+        sleep 3
+        continue
+    fi
     
     EFFECTIVE_ID=$(echo "$POLL_RESPONSE" | jq -r '.effective_object_story_id')
 
     if [ -n "$EFFECTIVE_ID" ] && [ "$EFFECTIVE_ID" != "null" ]; then
-        echo "  SUCCESS: Got final Post ID: $EFFECTIVE_ID"
+        echo "  ✅ SUCCESS: Got final Post ID: $EFFECTIVE_ID"
         break
     fi
     
@@ -130,18 +218,34 @@ echo ""
 # --- Step 5: Publish the Post ---
 echo " STEP 5: Publishing the post..."
 PUBLISH_URL="https://graph.facebook.com/v21.0/${EFFECTIVE_ID}"
+echo "  Debug: Using ACCESS_TOKEN2: ${ACCESS_TOKEN2:0:20}..."
+
 # IMPORTANT: Use ACCESS_TOKEN2 for the final publish command
-PUBLISH_RESPONSE=$(curl -s -X POST "${PUBLISH_URL}?access_token=${ACCESS_TOKEN2}" \
+PUBLISH_RESPONSE=$(curl -w "%{http_code}" -s -X POST "${PUBLISH_URL}?access_token=${ACCESS_TOKEN2}" \
   -H "Content-Type: application/json" \
   -H "Cookie: $COOKIE_DATA" \
-  --data-raw '{"is_published":true}')
+  --data-raw '{"is_published":true}' \
+  --max-time 20 \
+  --connect-timeout 10)
+
+CURL_EXIT_CODE=$?
+HTTP_CODE="${PUBLISH_RESPONSE: -3}"
+PUBLISH_RESPONSE="${PUBLISH_RESPONSE%???}"
+
+check_curl_response $CURL_EXIT_CODE "$PUBLISH_RESPONSE" "Publish Post"
+
+if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+    echo "  ❌ ERROR: HTTP $HTTP_CODE when publishing post"
+    echo "  Response: $PUBLISH_RESPONSE"
+    exit 1
+fi
 
 PUBLISH_SUCCESS=$(echo "$PUBLISH_RESPONSE" | jq -r '.success')
 if [ "$PUBLISH_SUCCESS" == "true" ]; then
-    echo "  SUCCESS: Post has been published successfully!"
-    echo "  View post at: https://www.facebook.com/$EFFECTIVE_ID"
+    echo "  ✅ SUCCESS: Post has been published successfully!"
+    echo "  📱 View post at: https://www.facebook.com/$EFFECTIVE_ID"
 else
-    echo "  ERROR: Failed to publish the post. Response was:"
+    echo "  ❌ ERROR: Failed to publish the post. Response was:"
     echo "  $PUBLISH_RESPONSE"
     exit 1
 fi
