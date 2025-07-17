@@ -112,25 +112,65 @@
 
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  border-radius: 10px;
   transition: width 0.3s ease;
-  border-radius: 4px;
+  animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
   0% {
-    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7);
   }
-  50% {
-    opacity: 0.7;
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 123, 255, 0);
   }
   100% {
-    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(0, 123, 255, 0);
   }
 }
 
-.progressFill {
-  animation: pulse 2s infinite;
+.stepList {
+  display: grid;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.stepItem {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-left: 4px solid transparent;
+}
+
+.stepItem.completed {
+  background-color: #d4edda;
+  color: #155724;
+  border-left-color: #28a745;
+}
+
+.stepItem.pending {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  border-left-color: #dee2e6;
+}
+
+.stepItem.active {
+  background-color: #cce7ff;
+  color: #004085;
+  border-left-color: #007bff;
+  animation: stepPulse 1.5s infinite;
+}
+
+@keyframes stepPulse {
+  0%, 100% {
+    background-color: #cce7ff;
+  }
+  50% {
+    background-color: #b3d9ff;
+  }
 }
 
 .output pre {

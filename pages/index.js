@@ -50,65 +50,52 @@ export default function Home() {
   }
 
   const updateProgress = (allMessages) => {
-    // Clean message for better matching
-    const cleanMessage = allMessages.replace(/\n/g, ' ').trim()
+    // Split messages into lines for better detection
+    const lines = allMessages.split('\n')
+    const lastFewLines = lines.slice(-10).join(' ').trim()
     
-    // Debug log
-    console.log('Progress check:', cleanMessage.substring(cleanMessage.length - 100))
+    // Debug: Show what we're checking
+    console.log('🔍 Checking lines:', lastFewLines)
     
-    if (cleanMessage.includes('🔄 Server received publish request')) {
-      setCurrentStep('เริ่มต้นการประมวลผล')
-      setProgress(8)
-    } else if (cleanMessage.includes('✅ Form data extracted successfully')) {
-      setCurrentStep('ตรวจสอบข้อมูล')
-      setProgress(12)
-    } else if (cleanMessage.includes('✅ Image prepared successfully')) {
-      setCurrentStep('เตรียมรูปภาพเรียบร้อย')
-      setProgress(18)
-    } else if (cleanMessage.includes('✅ Facebook Publisher initialized successfully')) {
-      setCurrentStep('เตรียมระบบ Facebook')
-      setProgress(22)
-    } else if (cleanMessage.includes('🔄 STEP 1: Creating Ad Creative')) {
-      setCurrentStep('สร้าง Ad Creative')
-      setProgress(28)
-    } else if (cleanMessage.includes('✅ Creative created successfully')) {
-      setCurrentStep('สร้าง Creative สำเร็จ')
-      setProgress(38)
-    } else if (cleanMessage.includes('🔄 STEP 2: Triggering post processing')) {
-      setCurrentStep('เริ่มกระบวนการประมวลผล')
-      setProgress(48)
-    } else if (cleanMessage.includes('✅ Processing triggered successfully')) {
-      setCurrentStep('ประมวลผลสำเร็จ')
-      setProgress(52)
-    } else if (cleanMessage.includes('🔄 STEP 3: Fetching Page Access Token')) {
-      setCurrentStep('ดึง Page Access Token')
-      setProgress(58)
-    } else if (cleanMessage.includes('🔄 STEP 4: Waiting for Facebook to generate Post ID')) {
-      setCurrentStep('รอ Facebook สร้าง Post ID')
-      setProgress(68)
-    } else if (cleanMessage.includes('🔍 Attempt') && cleanMessage.includes('Checking for Post ID')) {
-      const attemptMatch = cleanMessage.match(/🔍 Attempt (\d+)\/10/)
-      if (attemptMatch) {
-        const attempt = parseInt(attemptMatch[1])
-        const progressValue = 68 + (attempt * 1.2) // Increment by 1.2% per attempt
-        setCurrentStep(`กำลังตรวจสอบ Post ID (ครั้งที่ ${attempt}/10)`)
-        setProgress(Math.min(progressValue, 78))
+    // Check each step pattern
+    const stepPatterns = [
+      { pattern: 'Server received publish request', step: 'เริ่มต้นการประมวลผล', progress: 8 },
+      { pattern: 'Form data extracted successfully', step: 'ตรวจสอบข้อมูล', progress: 12 },
+      { pattern: 'Image prepared successfully', step: 'เตรียมรูปภาพเรียบร้อย', progress: 18 },
+      { pattern: 'Facebook Publisher initialized successfully', step: 'เตรียมระบบ Facebook', progress: 22 },
+      { pattern: 'STEP 1: Creating Ad Creative', step: '📝 STEP 1: สร้าง Ad Creative', progress: 30 },
+      { pattern: 'Creative created successfully', step: '✅ STEP 1: สร้าง Creative สำเร็จ', progress: 40 },
+      { pattern: 'STEP 2: Triggering post processing', step: '⚙️ STEP 2: เริ่มกระบวนการประมวลผล', progress: 50 },
+      { pattern: 'Processing triggered successfully', step: '✅ STEP 2: ประมวลผลสำเร็จ', progress: 55 },
+      { pattern: 'STEP 3: Fetching Page Access Token', step: '🔑 STEP 3: ดึง Page Access Token', progress: 60 },
+      { pattern: 'Page access token retrieved successfully', step: '✅ STEP 3: ได้ Access Token แล้ว', progress: 65 },
+      { pattern: 'STEP 4: Waiting for Facebook to generate Post ID', step: '⏳ STEP 4: รอ Facebook สร้าง Post ID', progress: 70 },
+      { pattern: 'Post ID generated successfully', step: '✅ STEP 4: ได้รับ Post ID แล้ว', progress: 80 },
+      { pattern: 'STEP 5: Publishing the post', step: '🚀 STEP 5: เผยแพร่โพสต์', progress: 90 },
+      { pattern: 'Post published successfully', step: '✅ STEP 5: เผยแพร่สำเร็จ!', progress: 95 },
+      { pattern: 'SUCCESS! Post published successfully', step: '🎉 เสร็จสิ้น!', progress: 100 },
+      { pattern: 'PUBLISHING FAILED', step: '❌ เกิดข้อผิดพลาด', progress: 0 }
+    ]
+    
+    // Find the latest matching pattern
+    for (let i = stepPatterns.length - 1; i >= 0; i--) {
+      const { pattern, step, progress } = stepPatterns[i]
+      if (lastFewLines.includes(pattern)) {
+        console.log(`✅ Found pattern: "${pattern}" -> ${step} (${progress}%)`)
+        setCurrentStep(step)
+        setProgress(progress)
+        break
       }
-    } else if (cleanMessage.includes('✅ Post ID generated successfully')) {
-      setCurrentStep('ได้รับ Post ID แล้ว')
-      setProgress(82)
-    } else if (cleanMessage.includes('🔄 STEP 5: Publishing the post')) {
-      setCurrentStep('เผยแพร่โพสต์')
-      setProgress(92)
-    } else if (cleanMessage.includes('✅ Post published successfully')) {
-      setCurrentStep('เผยแพร่สำเร็จ!')
-      setProgress(96)
-    } else if (cleanMessage.includes('🎉 SUCCESS! Post published successfully')) {
-      setCurrentStep('เสร็จสิ้น!')
-      setProgress(100)
-    } else if (cleanMessage.includes('💥 PUBLISHING FAILED')) {
-      setCurrentStep('เกิดข้อผิดพลาด')
-      setProgress(0)
+    }
+    
+    // Special handling for attempt counting
+    const attemptMatch = lastFewLines.match(/Attempt (\d+)\/10/)
+    if (attemptMatch && lastFewLines.includes('Checking for Post ID')) {
+      const attempt = parseInt(attemptMatch[1])
+      const progressValue = 70 + (attempt * 1)
+      setCurrentStep(`⏳ STEP 4: ตรวจสอบ Post ID (ครั้งที่ ${attempt}/10)`)
+      setProgress(Math.min(progressValue, 79))
+      console.log(`🔄 Attempt ${attempt}/10 detected, progress: ${progressValue}%`)
     }
   }
 
@@ -258,8 +245,54 @@ export default function Home() {
                 style={{ width: `${progress}%` }}
               ></div>
             </div>
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-              📊 Progress tracking: {progress > 5 ? '✅ Active' : '⏳ Waiting...'}
+            
+            {/* Step-by-step display */}
+            <div style={{ marginTop: '15px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '10px', color: '#333', fontSize: '16px' }}>ขั้นตอนการทำงาน:</div>
+              <div className={styles.stepList}>
+                <div className={`${styles.stepItem} ${
+                  progress >= 40 ? styles.completed : 
+                  (progress >= 30 && progress < 40) ? styles.active : styles.pending
+                }`}>
+                  {progress >= 40 ? '✅' : progress >= 30 ? '🔄' : '⏳'} STEP 1: สร้าง Ad Creative
+                </div>
+                <div className={`${styles.stepItem} ${
+                  progress >= 55 ? styles.completed : 
+                  (progress >= 50 && progress < 55) ? styles.active : styles.pending
+                }`}>
+                  {progress >= 55 ? '✅' : progress >= 50 ? '🔄' : '⏳'} STEP 2: เริ่มกระบวนการประมวลผล
+                </div>
+                <div className={`${styles.stepItem} ${
+                  progress >= 65 ? styles.completed : 
+                  (progress >= 60 && progress < 65) ? styles.active : styles.pending
+                }`}>
+                  {progress >= 65 ? '✅' : progress >= 60 ? '🔄' : '⏳'} STEP 3: ดึง Page Access Token
+                </div>
+                <div className={`${styles.stepItem} ${
+                  progress >= 80 ? styles.completed : 
+                  (progress >= 70 && progress < 80) ? styles.active : styles.pending
+                }`}>
+                  {progress >= 80 ? '✅' : progress >= 70 ? '🔄' : '⏳'} STEP 4: รอ Facebook สร้าง Post ID
+                </div>
+                <div className={`${styles.stepItem} ${
+                  progress >= 95 ? styles.completed : 
+                  (progress >= 90 && progress < 95) ? styles.active : styles.pending
+                }`}>
+                  {progress >= 95 ? '✅' : progress >= 90 ? '🔄' : '⏳'} STEP 5: เผยแพร่โพสต์
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6' }}>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#495057', marginBottom: '5px' }}>
+                สถานะปัจจุบัน:
+              </div>
+              <div style={{ fontSize: '13px', color: '#6c757d' }}>
+                {currentStep || 'รอการเริ่มต้น...'}
+              </div>
+              <div style={{ fontSize: '12px', color: '#868e96', marginTop: '5px' }}>
+                ความคืบหน้า: {progress}% | {progress > 5 ? '🔄 กำลังดำเนินการ' : '⏳ รอการเริ่มต้น'}
+              </div>
             </div>
           </div>
         )}
