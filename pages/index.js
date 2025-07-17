@@ -57,12 +57,13 @@ export default function Home() {
     // Debug: Show what we're checking
     console.log('🔍 Checking lines:', lastFewLines)
     
-    // Check each step pattern
+    // Check each step pattern - ตรงกับข้อความจาก backend
     const stepPatterns = [
-      { pattern: 'Server received publish request', step: 'เริ่มต้นการประมวลผล', progress: 8 },
-      { pattern: 'Form data extracted successfully', step: 'ตรวจสอบข้อมูล', progress: 12 },
-      { pattern: 'Image prepared successfully', step: 'เตรียมรูปภาพเรียบร้อย', progress: 18 },
-      { pattern: 'Facebook Publisher initialized successfully', step: 'เตรียมระบบ Facebook', progress: 22 },
+      { pattern: 'Server received publish request', step: 'เริ่มต้นการประมวลผล', progress: 5 },
+      { pattern: 'Form data extracted successfully', step: 'ตรวจสอบข้อมูล', progress: 10 },
+      { pattern: 'Image prepared successfully', step: 'เตรียมรูปภาพเรียบร้อย', progress: 15 },
+      { pattern: 'Facebook Publisher initialized successfully', step: 'เตรียมระบบ Facebook', progress: 20 },
+      { pattern: 'Starting Facebook publishing process', step: 'เริ่มกระบวนการ Facebook', progress: 25 },
       { pattern: 'STEP 1: Creating Ad Creative', step: '📝 STEP 1: สร้าง Ad Creative', progress: 30 },
       { pattern: 'Creative created successfully', step: '✅ STEP 1: สร้าง Creative สำเร็จ', progress: 40 },
       { pattern: 'STEP 2: Triggering post processing', step: '⚙️ STEP 2: เริ่มกระบวนการประมวลผล', progress: 50 },
@@ -103,8 +104,8 @@ export default function Home() {
     e.preventDefault()
     setIsPublishing(true)
     setOutput('⏳ เริ่มต้นการเผยแพร่...\n')
-    setCurrentStep('เตรียมข้อมูล')
-    setProgress(5)
+    setCurrentStep('เริ่มต้นการส่งข้อมูล...')
+    setProgress(1)
     setAllMessages('')
 
     const formDataToSend = new FormData()
@@ -233,7 +234,8 @@ export default function Home() {
           {isPublishing ? 'กำลังเผยแพร่...' : 'เผยแพร่ไปยัง Facebook'}
         </button>
 
-        {isPublishing && (
+        {/* Progress Display */}
+        {(progress > 0 || isSubmitting) && (
           <div className={styles.progressContainer}>
             <div className={styles.progressInfo}>
               <span className={styles.currentStep}>{currentStep}</span>
@@ -252,9 +254,9 @@ export default function Home() {
               <div className={styles.stepList}>
                 <div className={`${styles.stepItem} ${
                   progress >= 40 ? styles.completed : 
-                  (progress >= 30 && progress < 40) ? styles.active : styles.pending
+                  (progress >= 25 && progress < 40) ? styles.active : styles.pending
                 }`}>
-                  {progress >= 40 ? '✅' : progress >= 30 ? '🔄' : '⏳'} STEP 1: สร้าง Ad Creative
+                  {progress >= 40 ? '✅' : progress >= 25 ? '🔄' : '⏳'} STEP 1: สร้าง Ad Creative
                 </div>
                 <div className={`${styles.stepItem} ${
                   progress >= 55 ? styles.completed : 
@@ -291,9 +293,21 @@ export default function Home() {
                 {currentStep || 'รอการเริ่มต้น...'}
               </div>
               <div style={{ fontSize: '12px', color: '#868e96', marginTop: '5px' }}>
-                ความคืบหน้า: {progress}% | {progress > 5 ? '🔄 กำลังดำเนินการ' : '⏳ รอการเริ่มต้น'}
+                ความคืบหน้า: {progress}% | {progress > 0 ? '🔄 กำลังดำเนินการ' : '⏳ รอการเริ่มต้น'}
               </div>
             </div>
+            
+            {/* Debug Display - แสดงข้อความล่าสุดจาก Backend */}
+            {allMessages && (
+              <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#fff3cd', borderRadius: '6px', border: '1px solid #ffeaa7' }}>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
+                  🔍 Debug - ข้อความล่าสุดจาก Backend:
+                </div>
+                <div style={{ fontSize: '11px', color: '#856404', fontFamily: 'monospace', maxHeight: '100px', overflow: 'auto' }}>
+                  {allMessages.split('\n').slice(-5).join('\n')}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </form>
