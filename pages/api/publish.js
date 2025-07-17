@@ -59,6 +59,7 @@ export default async function handler(req, res) {
     
     // Send immediate response
     res.write('🔄 Server received publish request...\n')
+    res.flushHeaders() // Force send headers immediately
     res.write('📋 Extracting form data...\n')
     
     const { 
@@ -76,6 +77,7 @@ export default async function handler(req, res) {
     res.write('✅ Form data extracted successfully\n')
     res.write(`  🔗 Link URL: ${linkUrl}\n`)
     res.write(`  📝 Link Name: ${linkName}\n`)
+    if (res.flush) res.flush()
     
     if (!req.file) {
       res.write('❌ No image file was uploaded\n')
@@ -86,6 +88,7 @@ export default async function handler(req, res) {
     res.write('📤 Preparing image for upload...\n')
     res.write(`  📁 Original filename: ${req.file.originalname}\n`)
     res.write(`  📏 File size: ${(req.file.size / 1024 / 1024).toFixed(2)} MB\n`)
+    if (res.flush) res.flush()
     
     // Get file extension from original filename
     const fileExtension = path.extname(req.file.originalname) || '.jpg'
@@ -104,6 +107,7 @@ export default async function handler(req, res) {
     const imageUrl = `${protocol}://${host}/uploads/${newFilename}`
     res.write(`✅ Image prepared successfully!\n`)
     res.write(`  🌐 Public URL: ${imageUrl}\n\n`)
+    if (res.flush) res.flush()
     
     if (!accessToken || !cookieData || !linkUrl || !linkName) {
       res.write('❌ Missing required fields\n')
@@ -115,6 +119,7 @@ export default async function handler(req, res) {
     res.write('🔄 Initializing Facebook Publisher...\n')
     res.write(`  🏢 Ad Account ID: ${adAccountId || 'act_1148837732288721'}\n`)
     res.write(`  📄 Page ID: ${pageId || '146000051932080'}\n`)
+    if (res.flush) res.flush()
     
     const publisher = new FacebookPublisher({
       accessToken,
@@ -126,6 +131,7 @@ export default async function handler(req, res) {
 
     res.write('✅ Facebook Publisher initialized successfully\n')
     res.write('🚀 Starting Facebook publishing process...\n\n')
+    if (res.flush) res.flush()
 
     // Track start time
     const startTime = Date.now()
@@ -137,12 +143,14 @@ export default async function handler(req, res) {
     console.log = (...args) => {
       const message = args.join(' ') + '\n'
       res.write(message)
+      if (res.flush) res.flush() // Force flush each message
       originalLog(...args)
     }
     
     console.error = (...args) => {
       const message = '❌ ' + args.join(' ') + '\n'
       res.write(message)
+      if (res.flush) res.flush() // Force flush each message
       originalError(...args)
     }
 
