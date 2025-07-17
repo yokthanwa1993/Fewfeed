@@ -235,7 +235,7 @@ export default function Home() {
         </button>
 
         {/* Progress Display */}
-        {(progress > 0 || isSubmitting) && (
+        {(progress > 0 || isPublishing) && (
           <div className={styles.progressContainer}>
             <div className={styles.progressInfo}>
               <span className={styles.currentStep}>{currentStep}</span>
