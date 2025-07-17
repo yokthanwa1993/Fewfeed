@@ -55,7 +55,9 @@ export default function Home() {
     const lastFewLines = lines.slice(-10).join(' ').trim()
     
     // Debug: Show what we're checking
-    console.log('🔍 Checking lines:', lastFewLines)
+    console.log('🔍 ALL MESSAGES RECEIVED:', allMessages)
+    console.log('🔍 LAST FEW LINES:', lastFewLines)
+    console.log('🔍 TOTAL LINES:', lines.length)
     
     // Check each step pattern - ตรงกับข้อความจาก backend
     const stepPatterns = [
@@ -79,14 +81,23 @@ export default function Home() {
     ]
     
     // Find the latest matching pattern
+    let patternFound = false
     for (let i = stepPatterns.length - 1; i >= 0; i--) {
       const { pattern, step, progress } = stepPatterns[i]
       if (lastFewLines.includes(pattern)) {
-        console.log(`✅ Found pattern: "${pattern}" -> ${step} (${progress}%)`)
+        console.log(`✅ PATTERN MATCHED: "${pattern}" -> ${step} (${progress}%)`)
         setCurrentStep(step)
         setProgress(progress)
+        patternFound = true
         break
       }
+    }
+    
+    if (!patternFound) {
+      console.log('❌ NO PATTERN MATCHED! Available patterns:')
+      stepPatterns.forEach(({pattern}, index) => {
+        console.log(`  ${index}: "${pattern}"`)
+      })
     }
     
     // Special handling for attempt counting
@@ -130,9 +141,11 @@ export default function Home() {
         if (done) break
         
         const chunk = decoder.decode(value, { stream: true })
+        console.log('📨 RECEIVED CHUNK:', chunk)
         setOutput(prev => prev + chunk)
         setAllMessages(prev => {
           const newMessages = prev + chunk
+          console.log('📝 UPDATING PROGRESS WITH:', newMessages)
           updateProgress(newMessages)
           return newMessages
         })
